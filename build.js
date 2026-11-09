@@ -85,8 +85,16 @@ html = html.split("Billy247_files/").join("assets/");
 html = html.split("frontend-lite(1).min.css").join("elementor-pro-frontend-lite.min.css");
 html = html.split("frontend-lite%281%29.min.css").join("elementor-pro-frontend-lite.min.css");
 
-// Neutralize every <a href> - clicks do absolutely nothing
-html = html.replace(/(<a\b[^>]*?\bhref=)["'][^"']*["']/gi, '$1"javascript:void(0)"');
+// Neutralize every <a href> - clicks do absolutely nothing.
+// Exception: footer pages that exist on the original site stay real links.
+const LIVE_LINKS = new Set([
+  "https://billy247.com/contact-us/",
+  "https://billy247.com/faqs/",
+  "https://billy247.com/privacy-policy/",
+]);
+html = html.replace(/(<a\b[^>]*?\bhref=)["']([^"']*)["']/gi, (m, pre, url) =>
+  LIVE_LINKS.has(url) ? `${pre}"${url}"` : `${pre}"javascript:void(0)"`
+);
 // Strip target=_blank etc. so dead links can't even open an empty tab
 html = html.replace(/(<a\b[^>]*?)\s+target=["'][^"']*["']/gi, "$1");
 
