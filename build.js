@@ -136,6 +136,7 @@ html = html.replace(/(src=|url\(\s*)["']?https?:\/\/[^"')\s]*\/([^/"')\s]+)["']?
 
 // ---------- 3. Static + responsive overrides ----------
 const overrides = `
+<meta name="google-site-verification" content="nYK3pl-lI61C0PloGsKs59HowB8OR6PFG01hEnw3E6I" />
 <link rel="icon" href="assets/badge.png" type="image/png">
 <style id="static-overrides">
 /* Ensure everything is visible with zero JS */
