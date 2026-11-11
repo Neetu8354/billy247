@@ -134,9 +134,21 @@ html = html.replace(/(src=|url\(\s*)["']?https?:\/\/[^"')\s]*\/([^/"')\s]+)["']?
   localFiles.has(base) ? `${prefix}"assets/${base}"` : m
 );
 
-// ---------- 3. Static + responsive overrides ----------
+// ---------- 3. SEO ----------
+html = html.replace(
+  "<title>Billy247</title>",
+  "<title>Billy247 \u2013 Online Cricket &amp; Casino ID Provider in India</title>"
+);
+// First visible heading becomes the single H1; the ambassador line stays as an H2 (typo fixed)
+html = html.replace(
+  '<h2 class="elementor-heading-title elementor-size-default">BOhemia Official brand ambassador</h2>',
+  '<h1 class="elementor-heading-title elementor-size-default">Billy247 \u2013 Online Cricket &amp; Casino ID Provider in India</h1>\n\t\t\t\t\t<h2 class="elementor-heading-title elementor-size-default" style="font-size:20px;line-height:1.3">Bohemia Official Brand Ambassador</h2>'
+);
+
+// ---------- 4. Static + responsive overrides ----------
 const overrides = `
 <meta name="google-site-verification" content="nYK3pl-lI61C0PloGsKs59HowB8OR6PFG01hEnw3E6I" />
+<meta name="description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
 <link rel="icon" href="assets/badge.png" type="image/png">
 <style id="static-overrides">
 /* Ensure everything is visible with zero JS */
