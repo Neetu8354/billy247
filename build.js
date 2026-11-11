@@ -161,21 +161,24 @@ html = html.replace(/<link\b[^>]*href=["'](?:\.\/)?assets\/[^"']+["'][^>]*>/gi, 
 );
 console.log("bundle link placed:", bundlePlaced);
 
+// Site domain: the deploy target is billy247.shop - rewrite every billy247.com URL
+html = html.replace(/https?:\/\/(?:www\.)?billy247\.com/g, "https://www.billy247.shop");
+
 // ---------- Link policy ----------
 // 1. Strip every target/rel attr first - we re-add precisely per link class.
 html = html.replace(/(<a\b[^>]*?)\s+(?:target|rel)=["'][^"']*["']/gi, "$1");
 
 // 2. Classify by ORIGINAL href:
-//    walink.me            -> live CTA (WhatsApp)  -> _blank + nofollow sponsored noopener
-//    billy247.com         -> live, same tab (logo, footer pages, menu, in-text)
-//    exchange domains     -> live tile URLs       -> _blank + noopener
-//    billy247.com/#content -> local #content skip link
-//    anything else        -> href removed (inert anchor, keeps styling)
+//    walink.me              -> live CTA (WhatsApp)  -> _blank + nofollow sponsored noopener
+//    www.billy247.shop      -> live, same tab (logo, footer pages, menu, in-text)
+//    exchange domains       -> live tile URLs       -> _blank + noopener
+//    www.billy247.shop/#content -> local #content skip link
+//    anything else          -> href removed (inert anchor, keeps styling)
 const EXCH = "(?:www\\.)?(?:taj777|billyexch9|billy777|d247|diamondexch|lordsexch|tenexch|skyexch|world7)\\.";
 html = html.replace(/<a\b([^>]*?)\bhref=["']([^"']*)["']/gi, (m, attrs, url) => {
   if (/^https:\/\/walink\.me\//.test(url)) return `<a${attrs}href="${url}"`;
-  if (url === "https://billy247.com/#content") return `<a${attrs}href="#content"`;
-  if (/^https:\/\/billy247\.com\//.test(url)) return `<a${attrs}href="${url}"`;
+  if (url === "https://www.billy247.shop/#content") return `<a${attrs}href="#content"`;
+  if (/^https:\/\/www\.billy247\.shop\//.test(url)) return `<a${attrs}href="${url}"`;
   if (new RegExp("^https?://" + EXCH).test(url)) return `<a${attrs}href="${url}"`;
   if (url.startsWith("#")) return `<a${attrs}href="${url}"`;
   return `<a${attrs}`;
@@ -378,7 +381,7 @@ const overrides = `
 <meta property="og:type" content="website">
 <meta property="og:title" content="Billy247 – Online Cricket & Casino ID Provider in India">
 <meta property="og:description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
-<meta property="og:url" content="https://billy247.com/">
+<meta property="og:url" content="https://www.billy247.shop/">
 <meta property="og:image" content="https://www.billy247.shop/assets/banner-1.webp">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Billy247 – Online Cricket & Casino ID Provider in India">
