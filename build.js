@@ -93,10 +93,14 @@ const LIVE_LINKS = new Set([
   "https://billy247.com/privacy-policy/",
 ]);
 html = html.replace(/(<a\b[^>]*?\bhref=)["']([^"']*)["']/gi, (m, pre, url) =>
-  LIVE_LINKS.has(url) ? `${pre}"${url}"` : `${pre}"javascript:void(0)"`
+  LIVE_LINKS.has(url) || url.startsWith("https://walink.me/")
+    ? `${pre}"${url}"`
+    : `${pre}"javascript:void(0)"`
 );
-// Strip target=_blank etc. so dead links can't even open an empty tab
+// Strip target=_blank etc. so dead links can't even open an empty tab,
+// then re-add it to the few live external links so they open in a new tab.
 html = html.replace(/(<a\b[^>]*?)\s+target=["'][^"']*["']/gi, "$1");
+html = html.replace(/(<a\b(?=[^>]*href="https?:\/\/)(?![^>]*\btarget=)[^>]*?)>/gi, '$1 target="_blank" rel="noopener">');
 
 // Drop the entrance-animation hidden state so nothing stays invisible without JS
 html = html.replace(/\belementor-invisible\b/g, "");
