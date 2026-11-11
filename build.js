@@ -260,6 +260,9 @@ html = html.replace(/class="([^"]*)"/g, (m, cls) =>
 // ---------- Invalid HTML cleanup ----------
 // <title>Custom Ticker</title> inside body (from ticker widgets)
 html = html.split("<title>Custom Ticker</title>").join("");
+// Typos + footer year
+html = html.split("gurantee").join("guarantee");
+html = html.split("© 2023").join("© 2026");
 // Empty <p></p> inside FAQ accordion content
 html = html.split("<p></p>").join("");
 // Same markup for every FAQ title: <span>, not mixed <p>/<span>
@@ -367,7 +370,11 @@ html = html.replace(
 const overrides = `
 <meta name="google-site-verification" content="nYK3pl-lI61C0PloGsKs59HowB8OR6PFG01hEnw3E6I" />
 <meta name="description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
-<link rel="icon" href="assets/billy247-logo.webp" type="image/webp">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Billy247 – Online Cricket & Casino ID Provider in India">
 <meta property="og:description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
