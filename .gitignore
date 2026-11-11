@@ -1,0 +1,4 @@
+imgtools/
+node_modules/
+.playwright-mcp/
+desktop-optimized.png

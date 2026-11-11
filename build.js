@@ -19,15 +19,44 @@ if (!fs.existsSync(ASSET_DST)) {
   fs.mkdirSync(ASSET_DST, { recursive: true });
 }
 
+// source filename (in Billy247_files) -> shipped filename in assets/
 const renameMap = {
   "frontend-lite(1).min.css": "elementor-pro-frontend-lite.min.css",
-  "Untitled-design4.gif": "billy247-logo.gif",
-  "image-1.png": "billyexch9-logo.png",
-  "logo-2-1.png": "billy777-logo.png",
-  "download.png": "skyexch-logo.png",
-  "300kb.gif": "whatsapp-cta.gif",
-  "Screenshot-2023-08-16-180705.png": "money-guarantee.png",
+  "Untitled-design4.webp": "billy247-logo.webp",
+  "image-1.webp": "billyexch9-logo.webp",
+  "logo-2-1.webp": "billy777-logo.webp",
+  "download.webp": "skyexch-logo.webp",
+  "300kb.webp": "whatsapp-cta.webp",
+  "Screenshot-2023-08-16-180705.webp": "money-guarantee.webp",
 };
+
+// filenames as they appear in the saved .htm -> shipped filename
+const htmlRenameMap = {
+  "Untitled-design4.gif": "billy247-logo.webp",
+  "image-1.png": "billyexch9-logo.webp",
+  "logo-2-1.png": "billy777-logo.webp",
+  "download.png": "skyexch-logo.webp",
+  "300kb.gif": "whatsapp-cta.webp",
+  "Screenshot-2023-08-16-180705.png": "money-guarantee.webp",
+};
+
+// Unused/bloat files skipped when populating assets/
+const skipFiles = new Set([
+  "css", // saved Google Fonts response - replaced by self-hosted fonts.css
+  "animations.min.css", // animate.css - motion reduced, .animated neutralised
+  "brands.min.css", "fontawesome.min.css", "regular.min.css", "solid.min.css",
+  "v4-shims.min.css",   // all.min.css already covers solid+regular+brands; no FA4 names used
+  "elementor-icons.min.css", // no eicon-* classes used
+  "swiper.min.css",     // no swiper markup
+]);
+
+// Stylesheets actually used - concatenated (in document order) into assets/site.min.css
+const cssKeep = new Set([
+  "fonts.css", "all.min.css", "eael-237.css", "elementor-pro-frontend-lite.min.css",
+  "frontend-lite.min.css", "frontend.css", "general.min.css", "global.css",
+  "header-footer-elementor.css", "main.min.css", "post-164.css", "post-237.css",
+  "post-6.css", "post-7.css", "widget-icon-list.min.css",
+]);
 
 function copyDir(src, dst) {
   fs.mkdirSync(dst, { recursive: true });
@@ -38,35 +67,63 @@ function copyDir(src, dst) {
       continue;
     }
     if (f.endsWith(".download")) continue; // JS payloads - not needed, all scripts removed
+    if (skipFiles.has(f)) continue;
     fs.copyFileSync(s, path.join(dst, renameMap[f] || f));
   }
 }
 if (fs.existsSync(ASSET_DST)) fs.rmSync(ASSET_DST, { recursive: true, force: true });
 copyDir(ASSET_SRC, ASSET_DST);
 
-// Font Awesome css files reference ../webfonts - keep fonts inside assets/webfonts instead
-for (const f of ["all.min.css", "brands.min.css", "regular.min.css", "solid.min.css", "fontawesome.min.css", "v4-shims.min.css"]) {
-  const p = path.join(ASSET_DST, f);
-  if (fs.existsSync(p)) {
-    fs.writeFileSync(p, fs.readFileSync(p, "utf8").split("../webfonts/").join("./webfonts/"));
-  }
-}
+// Font Awesome css references ../webfonts - keep fonts inside assets/webfonts instead
+const faCss = path.join(ASSET_DST, "all.min.css");
+fs.writeFileSync(faCss, fs.readFileSync(faCss, "utf8").split("../webfonts/").join("./webfonts/"));
 
 // Rewrite remote billy247.com url() inside copied css files -> ./<basename> when the file exists locally
 const localFiles = new Set(fs.readdirSync(ASSET_DST));
+const webpVariant = (base) => {
+  const w = base.replace(/\.(png|jpe?g|gif)$/i, ".webp");
+  return localFiles.has(w) ? w : base;
+};
 for (const f of fs.readdirSync(ASSET_DST)) {
   if (!f.endsWith(".css")) continue;
   const p = path.join(ASSET_DST, f);
   let css = fs.readFileSync(p, "utf8");
   css = css.replace(/url\((['"]?)https?:\/\/[^)"']*\/([^/)'"]+)\1\)/g, (m, q, base) =>
-    localFiles.has(base) ? `url(${q}./${base}${q})` : m
+    localFiles.has(base) ? `url(${q}./${webpVariant(base)}${q})` : m
+  );
+  // local url() that still names the old raster file -> webp
+  css = css.replace(/url\((['"]?)\.\/([^/)'"]+\.(?:png|jpe?g|gif))\1\)/g, (m, q, base) =>
+    `url(${q}./${webpVariant(base)}${q})`
   );
   fs.writeFileSync(p, css);
 }
+
 console.log("assets/ populated");
 
 // ---------- 2. Transform HTML ----------
 let html = fs.readFileSync(SRC, "utf8");
+
+// Concatenate kept stylesheets into one bundle, preserving the document's
+// <link> order so the cascade is unchanged. fonts.css goes first.
+const linkRe = /<link\b[^>]*href=["'](?:\.\/)?Billy247_files\/([^"']+)["'][^>]*>/gi;
+const docOrder = [...html.matchAll(linkRe)]
+  .map((m) => renameMap[decodeURIComponent(m[1])] || decodeURIComponent(m[1]))
+  .map((f) => (f === "css" ? "fonts.css" : f));
+const bundleFiles = docOrder.filter((f) => cssKeep.has(f));
+if (!bundleFiles.includes("fonts.css")) bundleFiles.unshift("fonts.css");
+const minifyCss = (c) =>
+  c.replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([{}:;,>+~])\s*/g, "$1")
+    .replace(/;}/g, "}")
+    .replace(/@media([^{]+)\{/g, "@media$1{")
+    .trim();
+fs.writeFileSync(
+  path.join(ASSET_DST, "site.min.css"),
+  bundleFiles.map((f) => minifyCss(fs.readFileSync(path.join(ASSET_DST, f), "utf8"))).join("\n")
+);
+for (const f of bundleFiles) fs.rmSync(path.join(ASSET_DST, f), { force: true });
+console.log(`site.min.css: ${bundleFiles.length} stylesheets combined -> ${(fs.statSync(path.join(ASSET_DST, "site.min.css")).size / 1024).toFixed(0)}K`);
 
 // Drop the "saved from url" comment and editor-only remote background-image rules
 html = html.replace(/<!--\s*saved from url=[^>]*-->/i, "");
@@ -94,6 +151,15 @@ html = html.replace(/<meta\b[^>]*http-equiv=["']Content-Type["'][^>]*>/gi, '<met
 html = html.split("Billy247_files/").join("assets/");
 html = html.split("frontend-lite(1).min.css").join("elementor-pro-frontend-lite.min.css");
 html = html.split("frontend-lite%281%29.min.css").join("elementor-pro-frontend-lite.min.css");
+
+// All stylesheets are now a single bundle - swap the first <link> for it, drop the rest
+let bundlePlaced = false;
+html = html.replace(/<link\b[^>]*href=["'](?:\.\/)?assets\/[^"']+["'][^>]*>/gi, (m) =>
+  /stylesheet/i.test(m)
+    ? bundlePlaced ? "" : ((bundlePlaced = true), '<link rel="stylesheet" href="./assets/site.min.css">')
+    : m
+);
+console.log("bundle link placed:", bundlePlaced);
 
 // ---------- Link policy ----------
 // 1. Strip every target/rel attr first - we re-add precisely per link class.
@@ -201,39 +267,43 @@ html = html.replace(/<p class="eael-accordion-tab-title">([\s\S]*?)<\/p>/g,
   '<span class="eael-accordion-tab-title">$1</span>');
 
 // ---------- Asset renames (generic filenames -> descriptive) ----------
-for (const [oldN, newN] of Object.entries(renameMap)) {
-  if (oldN === newN) continue;
+for (const [oldN, newN] of Object.entries(htmlRenameMap)) {
   html = html.split(`./assets/${oldN}`).join(`./assets/${newN}`);
   html = html.split(`"assets/${oldN}`).join(`"assets/${newN}`);
 }
 
+// Raster refs (.png/.jpg/.jpeg/.gif) -> the converted .webp that now ships in assets/
+html = html.replace(/(assets\/[^"')\s>]+)\.(png|jpe?g|gif)(?=["')\s>?])/gi, (m, base, ext) =>
+  localFiles.has(`${path.basename(base)}.webp`) ? `${base}.webp` : m
+);
+
 // ---------- Image alt text ----------
 const ALTS = {
-  "billy247-logo.gif": "Billy247 logo",
-  "Tajj.png": "TAJ777 exchange logo",
-  "billyexch9-logo.png": "Billyexch9 exchange logo",
-  "billy777-logo.png": "Billy777 exchange logo",
-  "D247.png": "D247 exchange logo",
-  "DiamondExch.png": "DiamondExch exchange logo",
-  "lord-Exch.png": "Lords Exch exchange logo",
-  "TenExch.png": "Ten Exch exchange logo",
-  "skyexch-logo.png": "SkyExch exchange logo",
-  "World.png": "World7 exchange logo",
-  "whatsapp-cta.gif": "Get an ID instantly on WhatsApp",
-  "776fd9cbfc017d83b409fc2781bebb15-removebg-preview.png": "Bohemia - Billy247 brand ambassador",
-  "Object-06-1021x1024.png": "Billy247 casino games",
-  "money-guarantee.png": "100% Money Guarantee badge",
-  "1676192983_bronk-club-p-pozdravlenie-s-viigrishem-pinterest-12_prev_ui-removebg-preview-1.png": "Billy247 weekly winner",
-  "bonus.png": "3% deposit bonus icon",
-  "24-hours.png": "24/7 customer service icon",
-  "collaboration.png": "referral bonus icon",
-  "live.png": "live stream icon",
-  "online-game.png": "live games icon",
-  "database.png": "enhanced design icon",
-  "shield-1.png": "safe and secure icon",
-  "badge.png": "easy payment icon",
-  "live-1.png": "live streaming icon",
-  "customer-service-1.png": "customer support icon",
+  "billy247-logo.webp": "Billy247 logo",
+  "Tajj.webp": "TAJ777 exchange logo",
+  "billyexch9-logo.webp": "Billyexch9 exchange logo",
+  "billy777-logo.webp": "Billy777 exchange logo",
+  "D247.webp": "D247 exchange logo",
+  "DiamondExch.webp": "DiamondExch exchange logo",
+  "lord-Exch.webp": "Lords Exch exchange logo",
+  "TenExch.webp": "Ten Exch exchange logo",
+  "skyexch-logo.webp": "SkyExch exchange logo",
+  "World.webp": "World7 exchange logo",
+  "whatsapp-cta.webp": "Get an ID instantly on WhatsApp",
+  "776fd9cbfc017d83b409fc2781bebb15-removebg-preview.webp": "Bohemia - Billy247 brand ambassador",
+  "Object-06-1021x1024.webp": "Billy247 casino games",
+  "money-guarantee.webp": "100% Money Guarantee badge",
+  "1676192983_bronk-club-p-pozdravlenie-s-viigrishem-pinterest-12_prev_ui-removebg-preview-1.webp": "Billy247 weekly winner",
+  "bonus.webp": "3% deposit bonus icon",
+  "24-hours.webp": "24/7 customer service icon",
+  "collaboration.webp": "referral bonus icon",
+  "live.webp": "live stream icon",
+  "online-game.webp": "live games icon",
+  "database.webp": "enhanced design icon",
+  "shield-1.webp": "safe and secure icon",
+  "badge.webp": "easy payment icon",
+  "live-1.webp": "live streaming icon",
+  "customer-service-1.webp": "customer support icon",
 };
 for (const [file, alt] of Object.entries(ALTS)) {
   const re = new RegExp(`(<img\\b[^>]*src="\\./assets/${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*?\\balt=")[^"]*"`, "g");
@@ -247,6 +317,39 @@ html = html.replace(/\s(?:data-)?srcset=["'][^"']*["']/gi, "");
 html = html.replace(/(src=|url\(\s*)["']?https?:\/\/[^"')\s]*\/([^/"')\s]+)["']?/gi, (m, prefix, base) =>
   localFiles.has(base) ? `${prefix}"assets/${base}"` : m
 );
+// Remote refs rewritten above may still carry old raster extensions
+html = html.replace(/(assets\/[^"')\s>]+)\.(png|jpe?g|gif)(?=["')\s>?])/gi, (m, base) =>
+  localFiles.has(`${path.basename(base)}.webp`) ? `${base}.webp` : m
+);
+
+// Hero: real responsive srcset (768w/1366w variants generated at build time)
+html = html.replace(
+  /(<img\b[^>]*src="\.?\/?assets\/casino-background-67ppr1q6d49pwpaz\.webp"[^>]*?)\s*sizes="[^"]*"/,
+  '$1 srcset="./assets/casino-background-67ppr1q6d49pwpaz-768w.webp 768w, ./assets/casino-background-67ppr1q6d49pwpaz-1366w.webp 1366w, ./assets/casino-background-67ppr1q6d49pwpaz.webp 1920w" sizes="100vw"'
+);
+
+// Videos: no autoplay preload on page load - poster + lazy via preload="none"
+html = html.replace(/<video\b[^>]*>/g, (m) => {
+  const src = (m.match(/src="assets\/([^"]+\.mp4)"/) || [])[1];
+  let v = m.replace(/\s*autoplay(?:="")?/i, "");
+  if (src) {
+    const poster = src.replace(/\.mp4$/, "-poster.webp");
+    if (localFiles.has(poster)) {
+      v = v.replace("<video", `<video preload="none" poster="assets/${poster}"`);
+    }
+  }
+  return v;
+});
+
+// "Why Choose" bullets: 5 copies of the same ~800px inline SVG -> one <symbol> + <use>
+const wcuRe = /<svg[^>]*id="_x36_"[^>]*>([\s\S]*?)<\/svg>/g;
+const wcuFirst = wcuRe.exec(html);
+if (wcuFirst) {
+  const sym = `<svg style="display:none" aria-hidden="true"><symbol id="wcu-check" viewBox="0 0 512 512">${wcuFirst[1]}</symbol></svg>`;
+  html = html.replace(/(<body\b[^>]*>)/i, `$1${sym}`);
+  html = html.replace(wcuRe,
+    '<svg viewBox="0 0 512 512" width="800px" height="800px" fill="#000000"><use href="#wcu-check"/></svg>');
+}
 
 // ---------- 3. SEO ----------
 html = html.replace(
@@ -264,17 +367,17 @@ html = html.replace(
 const overrides = `
 <meta name="google-site-verification" content="nYK3pl-lI61C0PloGsKs59HowB8OR6PFG01hEnw3E6I" />
 <meta name="description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
-<link rel="icon" href="assets/billy247-logo.gif" type="image/gif">
+<link rel="icon" href="assets/billy247-logo.webp" type="image/webp">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Billy247 – Online Cricket & Casino ID Provider in India">
 <meta property="og:description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
 <meta property="og:url" content="https://billy247.com/">
-<meta property="og:image" content="https://www.billy247.shop/assets/banner-1.jpg">
+<meta property="og:image" content="https://www.billy247.shop/assets/banner-1.webp">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Billy247 – Online Cricket & Casino ID Provider in India">
 <meta name="twitter:description" content="Get your Billy247 ID on WhatsApp. Cricket, live casino, instant deposits and fast withdrawals. 24/7 support. 18+ only.">
-<meta name="twitter:image" content="https://www.billy247.shop/assets/banner-1.jpg">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Billy247","url":"https://www.billy247.shop/","logo":"https://www.billy247.shop/assets/billy247-logo.gif","contactPoint":{"@type":"ContactPoint","contactType":"customer support","url":"https://walink.me/billy247","availableLanguage":["en","hi"]}}</script>
+<meta name="twitter:image" content="https://www.billy247.shop/assets/banner-1.webp">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Billy247","url":"https://www.billy247.shop/","logo":"https://www.billy247.shop/assets/billy247-logo.webp","contactPoint":{"@type":"ContactPoint","contactType":"customer support","url":"https://walink.me/billy247","availableLanguage":["en","hi"]}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Billy247","alternateName":"Billy247 - Online Cricket & Casino ID Provider","url":"https://www.billy247.shop/"}</script>
 <style id="static-overrides">
 /* Ensure everything is visible with zero JS */
