@@ -413,6 +413,10 @@ const overrides = `
 /* Responsiveness safety net */
 img,video,iframe{max-width:100%;height:auto}
 html,body{overflow-x:hidden}
+/* Floating WhatsApp CTA is position:fixed with a wide transparent container -
+   let clicks pass through the empty area, keep the image/link clickable */
+.elementor-element-060b8b8{pointer-events:none}
+.elementor-element-060b8b8 a,.elementor-element-060b8b8 img{pointer-events:auto}
 @media (max-width:767px){
   .elementor-section{min-height:0!important}
   .elementor-column{min-width:0}
